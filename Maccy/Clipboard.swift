@@ -12,6 +12,11 @@ class Clipboard {
 
   private let pasteboard = NSPasteboard.general
 
+  // See http://nspasteboard.org for more details.
+  private let ignoredTypes: Set = []
+
+  private var changeCount: Int
+
   private var timer: Timer?
 
   private let dynamicTypePrefix = "dyn."
