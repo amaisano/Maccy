@@ -18,11 +18,6 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
-	<key>INIntentsSupported</key>
-	<array>
-		<string>Clearintent</string>
-		<string>SelectIntent</string>
-	</array>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.productivity</string>
 	<key>LSMinimumSystemVersion</key>
@@ -30,16 +25,13 @@
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSHumanReadableCopyright</key>
-	<string>Copyright © 2022 Alex Rodionov.</string>
-	<key>NSMainNibFile</key>
-	<string>Application</string>
+	<string>Copyright © Alexey Rodionov</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
-	<key>NSUserActivityTypes</key>
-	<array>
-		<string>ClearIntent</string>
-		<string>SelectIntent</string>
-	</array>
+	<key>SUEnableDownloaderService</key>
+	<true/>
+	<key>SUEnableInstallerLauncherService</key>
+	<true/>
 	<key>SUFeedURL</key>
 	<string>https://raw.githubusercontent.com/p0deje/Maccy/master/appcast.xml</string>
 </dict>

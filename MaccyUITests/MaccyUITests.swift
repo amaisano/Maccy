@@ -29,9 +29,24 @@ class MaccyUITests: XCTestCase {
   let html1 = "<a href='#'>foo</a>".data(using: .utf8)
   let html2 = "<a href='#'>bar</a>".data(using: .utf8)
 
+  let imageType = NSPredicate(
+    format: "elementType == %lu",
+    argumentArray: [XCUIElement.ElementType.image.rawValue]
+  )
+
+  var items: XCUIElementQuery {
+    app.descendants(matching: .any).matching(identifier: "copy-history-item")
+  }
+
+  var itemTitles: [String] {
+    items.allElementsBoundByIndex
+      .sorted(by: { $0.frame.origin.y < $1.frame.origin.y })
+      .compactMap { $0.value as? String }
+  }
+
   override func setUp() {
     super.setUp()
-    app.launchArguments.append("ui-testing")
+    app.launchArguments.append("enable-testing")
     app.launch()
 
     copyToClipboard(copy2)
@@ -43,272 +58,241 @@ class MaccyUITests: XCTestCase {
     app.terminate()
   }
 
-  func testPopupWithHotkey() {
+  func testPopupWithHotkey() throws {
     popUpWithHotkey()
-    XCTAssertTrue(app.menuItems[copy1].firstMatch.isSelected)
-    XCTAssertTrue(app.menuItems[copy1].exists)
-    XCTAssertTrue(app.menuItems[copy2].exists)
+    assertExists(items[copy1])
+    assertExists(items[copy2])
   }
 
-  func testCloseWithHotkey() {
-    popUpWithHotkey()
-    let historyItem = app.menuItems[copy1]
-    expectation(for: NSPredicate(format: "exists = 0"), evaluatedWith: historyItem)
+  func testCloseWithHotkey() throws {
+    popUpWithMouse()
+    assertExists(items[copy1])
     simulatePopupHotkey()
-    waitForExpectations(timeout: 3)
+    assertNotExists(items[copy1])
   }
 
   func testPopupWithMenubar() {
     popUpWithMouse()
-    XCTAssertTrue(app.menuItems[copy1].firstMatch.isSelected)
-    XCTAssertTrue(app.menuItems[copy1].exists)
-    XCTAssertTrue(app.menuItems[copy2].exists)
+    assertExists(items[copy1])
+    assertExists(items[copy2])
   }
 
   func testNewCopyIsAdded() {
-    popUpWithHotkey()
+    popUpWithMouse()
     let copy3 = UUID().uuidString
     copyToClipboard(copy3)
-    XCTAssertFalse(app.menuItems[copy3].exists)
+    assertExists(items[copy3])
     app.typeKey(.escape, modifierFlags: [])
-    popUpWithHotkey()
-    XCTAssertTrue(app.menuItems[copy3].exists)
-    XCTAssertTrue(app.menuItems[copy3].firstMatch.isSelected)
+    popUpWithMouse()
+    assertExists(items[copy2])
   }
 
   func testSearch() {
-    popUpWithHotkey()
+    popUpWithMouse()
     search(copy2)
-    XCTAssertEqual(app.searchFields.firstMatch.value as? String, copy2)
-    XCTAssertTrue(app.menuItems[copy2].exists)
-    XCTAssertTrue(app.menuItems[copy2].firstMatch.isSelected)
-    XCTAssertFalse(app.menuItems[copy1].exists)
+    assertSearchFieldValue(copy2)
+    assertExists(app.staticTexts[copy2])
+    assertNotExists(items[copy1])
   }
 
   func testSearchFiles() {
     copyToClipboard(file2)
     copyToClipboard(file1)
-    popUpWithHotkey()
+    popUpWithMouse()
     search(file2.lastPathComponent)
-    XCTAssertTrue(app.menuItems[file2.absoluteString].exists)
-    XCTAssertTrue(app.menuItems[file2.absoluteString].firstMatch.isSelected)
-    XCTAssertFalse(app.menuItems[file1.absoluteString].exists)
+    assertExists(items[file2.absoluteString])
+    assertNotExists(items[file1.absoluteString])
   }
 
   func testCopyWithClick() {
-    popUpWithHotkey()
-    app.menuItems[copy2].firstMatch.click()
-    XCTAssertEqual(pasteboard.string(forType: .string), copy2)
+    popUpWithMouse()
+    items[copy2].firstMatch.click()
+    assertPasteboardStringEquals(copy2)
   }
 
   func testCopyWithEnter() {
-    popUpWithHotkey()
-    hover(app.menuItems[copy2].firstMatch)
+    popUpWithMouse()
+    hover(items[copy2].firstMatch)
     app.typeKey(.enter, modifierFlags: [])
-    XCTAssertEqual(pasteboard.string(forType: .string), copy2)
+    assertPasteboardStringEquals(copy2)
   }
 
   func testCopyWithCommandShortcut() {
-    popUpWithHotkey()
+    popUpWithMouse()
     app.typeKey("2", modifierFlags: [.command])
-    XCTAssertEqual(pasteboard.string(forType: .string), copy2)
+    assertPasteboardStringEquals(copy2)
   }
 
   func testSearchAndCopyWithCommandShortcut() {
-    popUpWithHotkey()
+    popUpWithMouse()
     search(copy2)
     app.typeKey("1", modifierFlags: [.command])
-    XCTAssertEqual(pasteboard.string(forType: .string), copy2)
+    assertPasteboardStringEquals(copy2)
   }
 
   func testCopyImage() {
     copyToClipboard(image2)
     copyToClipboard(image1)
-    popUpWithHotkey()
-    visibleMenuItems()[2].click()
-    XCTAssertEqual(pasteboard.data(forType: .tiff)!.count, image2.tiffRepresentation!.count)
+    popUpWithMouse()
+    items.matching(imageType).allElementsBoundByIndex[1].click()
+    assertPasteboardDataCountEquals(image2.tiffRepresentation!.count, forType: .tiff)
   }
 
   func testCopyFile() {
     copyToClipboard(file2)
     copyToClipboard(file1)
-    popUpWithHotkey()
-    XCTAssertEqual(visibleMenuItemTitles()[1...2], [file1.absoluteString, file2.absoluteString])
+    popUpWithMouse()
 
-    app.menuItems[file2.absoluteString].firstMatch.click()
-    XCTAssertEqual(pasteboard.string(forType: .fileURL), file2.absoluteString)
+    XCTAssertEqual(itemTitles[0...1], [file1.absoluteString, file2.absoluteString])
+
+    items[file2.absoluteString].firstMatch.click()
+    assertPasteboardStringEquals(file2.absoluteString, forType: .fileURL)
   }
 
   // This test does not work because NSPasteboardItem somehow becomes "empty".
-  // 
+  //
   // func testCopyRTF() {
   //   copyToClipboard(rtf2, .rtf)
   //   copyToClipboard(rtf1, .rtf)
   //   popUpWithHotkey()
   //   XCTAssertEqual(visibleMenuItemTitles()[1...2], ["foo", "bar"])
   //
-  //   app.menuItems["bar"].firstMatch.click()
-  //  XCTAssertEqual(pasteboard.data(forType: .rtf), rtf2)
+  //   app.staticTexts["bar"].firstMatch.click()
+  //   XCTAssertEqual(pasteboard.data(forType: .rtf), rtf2)
   // }
 
   func testCopyHTML() {
     copyToClipboard(html2, .html)
     copyToClipboard(html1, .html)
-    popUpWithHotkey()
-    XCTAssertEqual(visibleMenuItemTitles()[1...2], ["foo", "bar"])
+    popUpWithMouse()
+    XCTAssertEqual(itemTitles[0...1], ["foo", "bar"])
 
-    app.menuItems["bar"].firstMatch.click()
-    XCTAssertEqual(pasteboard.data(forType: .html), html2)
+    items["bar"].firstMatch.click()
+    assertPasteboardDataEquals(html2, forType: .html)
+  }
+
+  func testDownArrow() {
+    popUpWithMouse()
+    app.typeKey(.downArrow, modifierFlags: [])
+    app.typeKey(.enter, modifierFlags: [])
+    assertPasteboardStringEquals(copy2)
+  }
+
+  func testUpArrow() {
+    popUpWithMouse()
+    app.typeKey(.downArrow, modifierFlags: [])
+    app.typeKey(.upArrow, modifierFlags: [])
+    app.typeKey(.enter, modifierFlags: [])
+    assertPasteboardStringEquals(copy1)
   }
 
   func testControlJ() {
-    popUpWithHotkey()
+    popUpWithMouse()
     app.typeKey("j", modifierFlags: [.control])
-    XCTAssertTrue(app.menuItems[copy2].firstMatch.isSelected)
+    app.typeKey(.enter, modifierFlags: [])
+    assertPasteboardStringEquals(copy2)
   }
 
   func testControlK() {
-    popUpWithHotkey()
-    app.typeKey(.downArrow, modifierFlags: [])
+    popUpWithMouse()
+    app.typeKey("j", modifierFlags: [.control])
     app.typeKey("k", modifierFlags: [.control])
-    XCTAssertTrue(app.menuItems[copy1].firstMatch.isSelected)
+    app.typeKey(.enter, modifierFlags: [])
+    assertPasteboardStringEquals(copy1)
   }
 
   func testDeleteEntry() {
-    popUpWithHotkey()
+    popUpWithMouse()
     app.typeKey(.delete, modifierFlags: [.option])
-    XCTAssertFalse(app.menuItems[copy1].exists)
-    XCTAssertTrue(app.menuItems[copy2].firstMatch.isSelected)
+    assertNotExists(items[copy1])
 
     app.typeKey(.escape, modifierFlags: [])
-    popUpWithHotkey()
-    XCTAssertFalse(app.menuItems[copy1].exists)
+    popUpWithMouse()
+    assertNotExists(items[copy1])
   }
 
   func testDeleteEntryDuringSearch() {
-    popUpWithHotkey()
+    popUpWithMouse()
     search(copy2)
     app.typeKey(.delete, modifierFlags: [.option])
-    XCTAssertFalse(app.menuItems[copy2].exists)
-    XCTAssertTrue(app.menuItems[copy1].firstMatch.isSelected)
+    assertNotExists(items[copy2])
 
     app.typeKey(.escape, modifierFlags: [])
-    popUpWithHotkey()
-    XCTAssertFalse(app.menuItems[copy2].exists)
+    popUpWithMouse()
+    assertNotExists(items[copy2])
   }
 
   func testClear() {
-    popUpWithHotkey()
+    popUpWithMouse()
     pin(copy2)
-    app.menuItems["Clear"].click()
+    app.staticTexts["Clear"].click()
     confirmClear()
-    popUpWithHotkey()
-    XCTAssertFalse(app.menuItems[copy1].exists)
-    XCTAssertTrue(app.menuItems[copy2].exists)
+    popUpWithMouse()
+    assertNotExists(items[copy1])
+    assertExists(items[copy2])
   }
 
   func testClearDuringSearch() {
-    popUpWithHotkey()
+    popUpWithMouse()
     search(copy2)
-    app.menuItems["Clear"].click()
+    app.staticTexts["Clear"].click()
     confirmClear()
-    popUpWithHotkey()
-    XCTAssertFalse(app.menuItems[copy1].exists)
-    XCTAssertFalse(app.menuItems[copy2].exists)
+    popUpWithMouse()
+    assertNotExists(items[copy1])
+    assertNotExists(items[copy2])
   }
 
   func testClearAll() {
-    popUpWithHotkey()
+    popUpWithMouse()
     pin(copy2)
-    XCUIElement.perform(withKeyModifiers: [.shift], block: {
-      app.menuItems["Clear all"].click()
-    })
+    XCUIElement.perform(withKeyModifiers: [.shift]) {
+      app.staticTexts["Clear all"].click()
+    }
     confirmClear()
-    popUpWithHotkey()
-    XCTAssertFalse(app.menuItems[copy1].exists)
-    XCTAssertFalse(app.menuItems[copy2].exists)
+    popUpWithMouse()
+    assertNotExists(items[copy1])
+    assertNotExists(items[copy2])
   }
 
   func testPin() {
-    popUpWithHotkey()
+    popUpWithMouse()
     pin(copy2)
-    XCTAssertEqual(visibleMenuItemTitles()[1...2], [copy2, copy1])
-    XCTAssertTrue(app.menuItems[copy2].firstMatch.isSelected)
+    XCTAssertEqual(itemTitles[0...1], [copy2, copy1])
 
     app.typeKey(.escape, modifierFlags: [])
-    popUpWithHotkey()
-    XCTAssertEqual(visibleMenuItemTitles()[1...2], [copy2, copy1])
-    XCTAssertTrue(app.menuItems[copy1].firstMatch.isSelected)
+    popUpWithMouse()
+    XCTAssertEqual(itemTitles[0...1], [copy2, copy1])
   }
 
   func testPinDuringSearch() {
-    popUpWithHotkey()
+    popUpWithMouse()
     search(copy2)
-    app.typeKey("p", modifierFlags: [.option])
-    XCTAssertEqual(app.searchFields.firstMatch.value as? String, "")
-    XCTAssertEqual(visibleMenuItemTitles()[1...2], [copy2, copy1])
-    XCTAssertTrue(app.menuItems[copy2].firstMatch.isSelected)
+    pin(copy2)
+    assertSearchFieldValue("")
+    XCTAssertEqual(itemTitles[0...1], [copy2, copy1])
   }
 
   func testUnpin() {
-    popUpWithHotkey()
+    popUpWithMouse()
     pin(copy2)
-    app.typeKey("p", modifierFlags: [.option]) // unpin
-    XCTAssertTrue(app.menuItems[copy2].firstMatch.isSelected)
-    XCTAssertEqual(visibleMenuItemTitles()[1...2], [copy1, copy2])
-  }
-
-  func testClearSearchWithCommandDelete() {
-    popUpWithHotkey()
-    search("foo bar")
-    app.typeKey(.delete, modifierFlags: [.command])
-    XCTAssertEqual(app.searchFields.firstMatch.value as? String, "")
+    pin(copy2)
+    XCTAssertEqual(itemTitles[0...1], [copy1, copy2])
   }
 
   func testRemoveLastWordFromSearchWithControlW() {
-    popUpWithHotkey()
+    popUpWithMouse()
     search("foo bar")
     app.typeKey("w", modifierFlags: [.control])
-    XCTAssertEqual(app.searchFields.firstMatch.value as? String, "foo ")
+    assertSearchFieldValue("foo ")
   }
 
-  func testAllowsToFocusSearchField() {
-    popUpWithHotkey()
-    // The first click succeeds because application is frontmost.
-    app.searchFields.firstMatch.click()
-    search("foo")
-    XCTAssertEqual(app.searchFields.firstMatch.value as? String, "foo")
-    // Now close the window AND focus another application
-    // by clicking outside of menu.
-    let textFieldCoordinates = app.searchFields.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
-    let outsideCoordinates = textFieldCoordinates.withOffset(CGVector(dx: 0, dy: -20))
-    outsideCoordinates.click()
-    // Open again and try to click and focus search field again.
-    popUpWithHotkey()
-    app.searchFields.firstMatch.click()
-    search("foo")
-    XCTAssertEqual(app.searchFields.firstMatch.value as? String, "foo")
-  }
-
-  func testPasteToSearchWithFieldUnfocused() {
-    popUpWithHotkey()
+  func testPasteToSearch() {
+    popUpWithMouse()
     app.typeKey("v", modifierFlags: [.command])
-    usleep(250000) // wait for search throttle
-    XCTAssertEqual(app.searchFields.firstMatch.value as? String, copy1)
-    XCTAssertTrue(app.menuItems[copy1].exists)
-    XCTAssertTrue(app.menuItems[copy1].firstMatch.isSelected)
-    XCTAssertFalse(app.menuItems[copy2].exists)
-  }
-
-  func testPasteToSearchWithFieldFocused() {
-    popUpWithHotkey()
-    app.searchFields.firstMatch.click()
-    app.typeKey("v", modifierFlags: [.command])
-    usleep(250000) // wait for search throttle
-    XCTAssertEqual(app.searchFields.firstMatch.value as? String, copy1)
-    XCTAssertTrue(app.menuItems[copy1].exists)
-    XCTAssertTrue(app.menuItems[copy1].firstMatch.isSelected)
-    XCTAssertFalse(app.menuItems[copy2].exists)
+    waitForSearch()
+    assertSearchFieldValue(copy1)
+    assertExists(items[copy1])
+    assertNotExists(items[copy2])
   }
 
   func testDisablesOnOptionClickingMenubarIcon() {
@@ -321,9 +305,9 @@ class MaccyUITests: XCTestCase {
     copyToClipboard(copy3)
     copyToClipboard(copy4)
 
-    popUpWithHotkey()
-    XCTAssertFalse(app.menuItems[copy3].exists)
-    XCTAssertFalse(app.menuItems[copy4].exists)
+    popUpWithMouse()
+    assertNotExists(items[copy3])
+    assertNotExists(items[copy4])
 
     app.typeKey(.escape, modifierFlags: [])
     XCUIElement.perform(withKeyModifiers: .option) {
@@ -341,18 +325,17 @@ class MaccyUITests: XCTestCase {
     copyToClipboard(copy3)
     copyToClipboard(copy4)
 
-    popUpWithHotkey()
-    XCTAssertFalse(app.menuItems[copy3].exists)
-    XCTAssertTrue(app.menuItems[copy4].exists)
+    popUpWithMouse()
+    assertNotExists(items[copy3])
+    assertExists(items[copy4])
   }
 
   func testCreatesNewCopyOnEnterWhenSearchResultsAreEmpty() {
-    popUpWithHotkey()
+    popUpWithMouse()
     search("foo bar")
     app.typeKey(.return, modifierFlags: [])
     XCTAssertEqual(pasteboard.string(forType: .string), "foo bar")
-    popUpWithHotkey()
-    XCTAssertTrue(app.menuItems["foo bar"].exists)
+    assertExists(items["foo bar"])
   }
 
   private func popUpWithHotkey() {
@@ -366,10 +349,14 @@ class MaccyUITests: XCTestCase {
   }
 
   private func simulatePopupHotkey() {
-    let commandDown = CGEvent(keyboardEventSource: nil, virtualKey: CGKeyCode(kVK_Command), keyDown: true)!
-    let commandUp = CGEvent(keyboardEventSource: nil, virtualKey: CGKeyCode(kVK_Command), keyDown: false)!
-    let shiftDown = CGEvent(keyboardEventSource: nil, virtualKey: CGKeyCode(kVK_Shift), keyDown: true)!
-    let shiftUp = CGEvent(keyboardEventSource: nil, virtualKey: CGKeyCode(kVK_Shift), keyDown: false)!
+    let commandDown = CGEvent(
+      keyboardEventSource: nil, virtualKey: CGKeyCode(kVK_Command), keyDown: true)!
+    let commandUp = CGEvent(
+      keyboardEventSource: nil, virtualKey: CGKeyCode(kVK_Command), keyDown: false)!
+    let shiftDown = CGEvent(
+      keyboardEventSource: nil, virtualKey: CGKeyCode(kVK_Shift), keyDown: true)!
+    let shiftUp = CGEvent(
+      keyboardEventSource: nil, virtualKey: CGKeyCode(kVK_Shift), keyDown: false)!
     shiftDown.flags = [.maskCommand]
     shiftUp.flags = [.maskCommand]
     let cDown = CGEvent(keyboardEventSource: nil, virtualKey: CGKeyCode(kVK_ANSI_C), keyDown: true)!
@@ -385,7 +372,7 @@ class MaccyUITests: XCTestCase {
   }
 
   private func waitUntilPoppedUp() {
-    if !app.menuItems.firstMatch.waitForExistence(timeout: 3) {
+    if !app.staticTexts.firstMatch.waitForExistence(timeout: 3) {
       XCTFail("Maccy did not pop up")
     }
   }
@@ -419,20 +406,13 @@ class MaccyUITests: XCTestCase {
 
   // Default interval for Maccy to check clipboard is 1 second
   private func waitTillClipboardCheck() {
-    usleep(1500000)
-  }
-
-  private func visibleMenuItemTitles() -> [String] {
-    return visibleMenuItems().map({ $0.title })
-  }
-
-  private func visibleMenuItems() -> [XCUIElement] {
-    return app.menuItems.allElementsBoundByIndex.filter({ $0.isHittable })
+    usleep(1_500_000)
   }
 
   private func pin(_ title: String) {
-    hover(app.menuItems[title].firstMatch)
+    hover(items[title].firstMatch)
     app.typeKey("p", modifierFlags: [.option])
+    usleep(1_500_000)
   }
 
   private func hover(_ element: XCUIElement) {
@@ -441,8 +421,80 @@ class MaccyUITests: XCTestCase {
   }
 
   private func search(_ string: String) {
-    app.typeText(string)
-    usleep(250000) // wait for search throttle
+    // NOTE: app.typeText is broken in Sonoma and causes some
+    //       Chars to be submitted with a .command mask (e.g. 'p', 'k' or 'j')
+    string.forEach {
+      app.typeKey("\($0)", modifierFlags: [])
+    }
+    waitForSearch()
+  }
+
+  private func waitForSearch() {
+    // NOTE: This is a hack and is flaky.
+    // Ideally we should wait for a proper condition to detect that search has settled down.
+    usleep(500000)  // wait for search throttle
+  }
+
+  private func assertExists(_ element: XCUIElement) {
+    expectation(for: NSPredicate(format: "exists = 1"), evaluatedWith: element)
+    waitForExpectations(timeout: 3)
+  }
+
+  private func assertNotExists(_ element: XCUIElement) {
+    expectation(for: NSPredicate(format: "exists = 0"), evaluatedWith: element)
+    waitForExpectations(timeout: 3)
+  }
+
+  private func assertNotVisible(_ element: XCUIElement) {
+    expectation(
+      for: NSPredicate(format: "(exists = 0) || (isHittable = 0)"), evaluatedWith: element)
+    waitForExpectations(timeout: 3)
+  }
+
+  private func assertPasteboardDataEquals(
+    _ expected: Data?, forType: NSPasteboard.PasteboardType = .string
+  ) {
+    let predicate = NSPredicate { (object, _) -> Bool in
+      guard let copy = object as? Data else {
+        return false
+      }
+
+      return self.pasteboard.data(forType: forType) == copy
+    }
+    expectation(for: predicate, evaluatedWith: expected)
+    waitForExpectations(timeout: 3)
+  }
+
+  private func assertPasteboardDataCountEquals(
+    _ expected: Int, forType: NSPasteboard.PasteboardType = .string
+  ) {
+    let predicate = NSPredicate { (object, _) -> Bool in
+      guard let count = object as? Int else {
+        return false
+      }
+
+      return self.pasteboard.data(forType: forType)!.count == count
+    }
+    expectation(for: predicate, evaluatedWith: expected)
+    waitForExpectations(timeout: 3)
+  }
+
+  private func assertPasteboardStringEquals(
+    _ expected: String?, forType: NSPasteboard.PasteboardType = .string
+  ) {
+    let predicate = NSPredicate { (object, _) -> Bool in
+      guard let copy = object as? String else {
+        return false
+      }
+
+      return self.pasteboard.string(forType: forType) == copy
+    }
+    expectation(for: predicate, evaluatedWith: expected)
+    waitForExpectations(timeout: 3)
+  }
+
+  private func assertSearchFieldValue(_ string: String) {
+    XCTAssertEqual(app.textFields.firstMatch.value as? String, string)
   }
 
   private func confirmClear() {

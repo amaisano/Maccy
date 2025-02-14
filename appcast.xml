@@ -6,34 +6,29 @@
     <description>Most recent changes with links to updates.</description>
     <language>en</language>
     <item>
-      <title>0.24.0</title>
+      <title>2.3.0</title>
       <description>
         <![CDATA[
           <ul>
-            <li>Added support for selecting an item in the history using its position number via Shortcuts (#315, #374).</li>
-            <li>Added support for clearing history via Shortcuts (#340).</li>
-            <li>Added Turkish localization (credits to @bitigchi).</li>
-            <li>Added preference to pop up in the center of a currently focused application window (#150).</li>
-            <li>Added support for <kbd>⌃ (CONTROL)</kbd> + <kbd>W</kbd> shortcut to remove last word when search field is focused.</li>
-            <li>Added support for creating a new copy by typing it and pressing <kbd>ENTER</kbd> when there are no search results (#341).</li>
-            <li>Added missing documentation about disabling by clicking on the menu icon with <kbd>⌥ (OPTION)</kbd> pressed.</li>
-            <li>Improved search field UI by using native macOS control.</li>
-            <li>Improved navigation using arrow keys (#442).</li>
-            <li>Improved pins preferences tab to allow selecting a key using a dropdown menu (#443).</li>
-            <li>Improved storage preferences tab to show the size as a number text field with a stepper (#188).</li>
-            <li>Fixed an issue of storage not respecting a sorting setting when removing oldest records (#427).</li>
-            <li>Fixed an issue when paste wouldn't work after opening preferences/about (#435).</li>
-            <li>Fixed an issue when pasting an item would update its source application with the one it has just been pasted to.</li>
+            <li>Added Belarusian translation.</li>
+            <li>Added separator line between pinned and unpinned items.</li>
+            <li>Added scrolling support for large texts in preview popover.</li>
+            <li>Added preview for HEIC image files.</li>
+            <li>Improved performance for large text copies.</li>
+            <li>Improved handling of hovered items.</li>
+            <li>Fixed paste + paste without formatting combination.</li>
+            <li>Fixed issue when file URLs were removed when pasting without formatting.</li>
+            <li>Fixed the issue when the first pinned item was not pre-selected and there were no unpinned items.</li>
           </ul>
         ]]>
       </description>
-      <pubDate>2022-08-31</pubDate>
-      <releaseNotesLink>https://github.com/p0deje/Maccy/releases/tag/0.24.0</releaseNotesLink>
-      <sparkle:minimumSystemVersion>10.14</sparkle:minimumSystemVersion>
+      <pubDate>2024-12-11</pubDate>
+      <releaseNotesLink>https://github.com/p0deje/Maccy/releases/tag/2.3.0</releaseNotesLink>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <enclosure
-        url="https://github.com/p0deje/Maccy/releases/download/0.24.0/Maccy.app.zip"
-        sparkle:version="13"
-        sparkle:shortVersionString="0.24.0"
+        url="https://github.com/p0deje/Maccy/releases/download/2.3.0/Maccy.app.zip"
+        sparkle:version="54"
+        sparkle:shortVersionString="2.3.0"
         length="0"
         type="application/octet-stream"
       />
